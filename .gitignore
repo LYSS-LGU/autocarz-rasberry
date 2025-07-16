@@ -1,0 +1,117 @@
+# ==================================
+# 🧠 AI 모델 파일 (용량이 클 수 있음)
+# ==================================
+/models/
+*.pt
+*.pth
+*.onnx
+*.pb
+*.h5
+*.keras
+*.tflite
+*.mlmodel
+*.engine
+
+# ==================================
+# 📡 실시간 감지 중 생성 파일
+# ==================================
+/captures/
+/saved_images/
+/recordings/
+/pi_detected_images/
+*.avi
+*.mkv
+*.mp4
+*.mov
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tiff
+
+# ==================================
+# 🌐 서버/Flask 관련 파일
+# ==================================
+instance/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.db
+*.sqlite3
+*.pid
+camera_settings.json
+config.json
+*.session
+
+# ==================================
+# 🧪 디버깅 / 로깅 결과
+# ==================================
+*.log
+*.tmp
+*.bak
+log_*.txt
+*.trace
+debug.txt
+error.log
+
+# ==================================
+# 🧬 PyTorch / Ultralytics 캐시 파일
+# ==================================
+ultralytics/
+/runs/
+.ultralytics/
+yolov*/
+torch_cache/
+
+# ==================================
+# 🐍 Python 가상환경
+# ==================================
+/venv/
+/env/
+/.venv/
+/.env/
+venv*/
+env*/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==================================
+# 💻 시스템 파일
+# ==================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+.nfs*
+
+# ==================================
+# 🛠️ IDE / 에디터 설정
+# ==================================
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/.ropeproject
+.idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+
+# ==================================
+# 🚫 설치 파일 및 큰 파일들
+# ==================================
+miniconda.sh
+anaconda*.sh
+*.jar
+*.sh
+*.deb
+*.rpm
+.git_backup/
