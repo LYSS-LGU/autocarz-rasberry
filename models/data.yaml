@@ -1,0 +1,5 @@
+path: C:\Users\Admin\Desktop\LYSS_LGU\aihub_gorani\yolo_dataset
+train: images/train
+val: images/val
+nc: 1
+names: ['고라니']

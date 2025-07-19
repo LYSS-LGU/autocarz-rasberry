@@ -1,0 +1,196 @@
+<!-- /home/pi/autocarz/templates/index.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라즈베리파이 YOLO + OpenCV 실시간 스트리밍</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="main-layout">
+        <!-- 메인 헤더 -->
+        <div class="main-header">
+            <h1>🔍 라즈베리파이 YOLO + OpenCV 이중 검출</h1>
+        </div>
+
+        <!-- 메인 콘텐츠 영역 -->
+        <div class="main-content-layout">
+            <!-- 좌측: 상태 정보 + 카메라 선택 -->
+            <div class="left-sidebar">
+                <!-- 시스템 상태 패널 -->
+                <div class="panel">
+                    <h3>📊 시스템 상태</h3>
+                    <div class="status-card">
+                        <span class="status-dot yolo-dot"></span>
+                        <span><strong>YOLO:</strong> {{ yolo_status }}</span>
+                    </div>
+                    <div class="status-card">
+                        <span class="status-dot opencv-dot"></span>
+                        <span><strong>OpenCV:</strong> {{ opencv_status }}</span>
+                    </div>
+                    <div class="status-card">
+                        <span><strong>카메라:</strong> {{ camera_info.name }} ({{ detection_settings.resolution }})</span>
+                    </div>
+                    <div class="status-card">
+                        <span><strong>현재 FPS:</strong> <span id="current_fps">--</span></span>
+                    </div>
+                </div>
+
+                <!-- 카메라 선택 패널 -->
+                <div class="panel">
+                    <h3>📹 카메라 선택</h3>
+                    <div class="camera-buttons">
+                        <button class="btn btn-camera" onclick="switchCamera(0)" id="camera-0">
+                            🖥️ 내장 웹캠 (HD Webcam)
+                        </button>
+                        <button class="btn btn-camera" onclick="switchCamera(1)" id="camera-1">
+                            📷 외장 웹캠 (SC-FD110B)
+                        </button>
+                    </div>
+                    <div class="status-card">
+                        현재 카메라: <span id="currentCamera">내장 웹캠</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 중앙: 비디오 스트리밍 영역 -->
+            <div class="center-video-area">
+                <!-- 비디오 헤더 -->
+                <div class="video-header">
+                    <h2>📺 실시간 이중 검출 스트리밍</h2>
+                    <div class="detection-legend">
+                        <span class="legend-item">
+                            <span class="color-indicator yolo-color"></span>
+                            <span>YOLO v8 검출</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="color-indicator opencv-color"></span>
+                            <span>OpenCV 검출</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 비디오 래퍼 -->
+                <div class="video-wrapper">
+                    <img src="/video_feed" alt="라이브 스트리밍" id="videoStream">
+                </div>
+            </div>
+
+            <!-- 우측: 설정 패널 -->
+            <div class="right-sidebar">
+                <div class="settings-panel">
+                    <div class="panel">
+                        <h3>⚙️ 설정 패널</h3>
+                        <div class="settings-content">
+                            <!-- 검출 설정 -->
+                            <div class="control-section">
+                                <h4>🎛️ 검출 설정</h4>
+                                
+                                <div class="control-label">
+                                    <input type="checkbox" id="yolo_enabled" {{ 'checked' if detection_settings.yolo_enabled else '' }}>
+                                    <span>YOLO 검출 (파란색)</span>
+                                </div>
+                                
+                                <div class="control-label">
+                                    <input type="checkbox" id="opencv_enabled" {{ 'checked' if detection_settings.opencv_enabled else '' }}>
+                                    <span>OpenCV 검출 (빨간색)</span>
+                                </div>
+                                
+                                <div class="control-label">
+                                    <input type="checkbox" id="show_fps" {{ 'checked' if detection_settings.show_fps else '' }}>
+                                    <span>FPS 정보 표시</span>
+                                </div>
+                                
+                                <div class="control-label">JPEG 품질:</div>
+                                <div class="range-container">
+                                    <input type="range" id="quality" min="50" max="100" value="{{ detection_settings.quality }}" class="range-slider">
+                                    <span class="range-value" id="quality_value">{{ detection_settings.quality }}</span>
+                                </div>
+                                
+                                <div class="control-label">FPS 제한:</div>
+                                <div class="range-container">
+                                    <input type="range" id="fps_limit" min="5" max="30" value="{{ detection_settings.fps_limit }}" class="range-slider">
+                                    <span class="range-value" id="fps_value">{{ detection_settings.fps_limit }}</span>
+                                </div>
+                                
+                                <button class="btn btn-primary" onclick="applyDetectionSettings()">검출 설정 적용</button>
+                            </div>
+
+                            <!-- 카메라 설정 -->
+                            <div class="control-section">
+                                <h4>📹 카메라 설정</h4>
+                                
+                                <div class="control-label">
+                                    <input type="checkbox" id="horizontal" {{ 'checked' if flip_settings.horizontal else '' }}>
+                                    <span>좌우 반전</span>
+                                </div>
+                                
+                                <div class="control-label">
+                                    <input type="checkbox" id="vertical" {{ 'checked' if flip_settings.vertical else '' }}>
+                                    <span>상하 반전</span>
+                                </div>
+                                
+                                <div class="control-label">회전:</div>
+                                <select id="rotation" class="range-slider">
+                                    <option value="0" {{ 'selected' if flip_settings.rotation == 0 else '' }}>0° (정상)</option>
+                                    <option value="90" {{ 'selected' if flip_settings.rotation == 90 else '' }}>90° (시계방향)</option>
+                                    <option value="180" {{ 'selected' if flip_settings.rotation == 180 else '' }}>180° (뒤집기)</option>
+                                    <option value="270" {{ 'selected' if flip_settings.rotation == 270 else '' }}>270° (반시계방향)</option>
+                                </select>
+                                
+                                <div class="button-row">
+                                    <button class="btn btn-primary" onclick="applySettings()">설정 적용</button>
+                                    <button class="btn btn-warning" onclick="resetSettings()">초기화</button>
+                                </div>
+                            </div>
+
+                            <!-- 색상 보정 설정 -->
+                            <div class="control-section">
+                                <h4>🎨 색상 보정 설정</h4>
+                                
+                                <div class="control-label">
+                                    <input type="checkbox" id="color_correction_enabled" {{ 'checked' if color_correction_settings.enabled else '' }}>
+                                    <span>색상 보정 사용</span>
+                                </div>
+                                
+                                <div class="control-label">빨간색 감소:</div>
+                                <div class="range-container">
+                                    <input type="range" id="red_reduction" min="0.5" max="1.0" step="0.05" value="{{ color_correction_settings.red_reduction }}" class="range-slider">
+                                    <span class="range-value" id="red_reduction_value">{{ color_correction_settings.red_reduction }}</span>
+                                </div>
+                                
+                                <div class="control-label">초록색 증가:</div>
+                                <div class="range-container">
+                                    <input type="range" id="green_boost" min="0.8" max="1.3" step="0.05" value="{{ color_correction_settings.green_boost }}" class="range-slider">
+                                    <span class="range-value" id="green_boost_value">{{ color_correction_settings.green_boost }}</span>
+                                </div>
+                                
+                                <div class="control-label">파란색 증가:</div>
+                                <div class="range-container">
+                                    <input type="range" id="blue_boost" min="0.8" max="1.3" step="0.05" value="{{ color_correction_settings.blue_boost }}" class="range-slider">
+                                    <span class="range-value" id="blue_boost_value">{{ color_correction_settings.blue_boost }}</span>
+                                </div>
+                                
+                                <div class="control-label">색상 모드:</div>
+                                <select id="color_mode" class="range-slider">
+                                    <option value="standard" {{ 'selected' if color_correction_settings.mode == 'standard' else '' }}>표준</option>
+                                    <option value="warm" {{ 'selected' if color_correction_settings.mode == 'warm' else '' }}>따뜻한 톤</option>
+                                    <option value="cool" {{ 'selected' if color_correction_settings.mode == 'cool' else '' }}>차가운 톤</option>
+                                </select>
+                                
+                                <div class="button-row">
+                                    <button class="btn btn-primary" onclick="applyColorSettings()">색상 보정 적용</button>
+                                    <button class="btn btn-warning" onclick="resetColorSettings()">초기화</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

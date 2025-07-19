@@ -1,0 +1,5 @@
+# Add directories or file patterns to ignore ddata/
+notebooks/
+*.log
+*.csv
+uring indexing (e.g. foo/ or *.csv)

@@ -1,396 +1,362 @@
 // /home/pi/autocarz/static/js/script.js
+// 새로운 레이아웃에 맞춰 전체적으로 수정 및 기능 추가된 버전
 
+// ===========================================
 // 페이지 로드 시 초기화
-document.addEventListener('DOMContentLoaded', function() {
-    // 슬라이더 값 표시 업데이트
-    updateSliderValues();
-    
-    // 슬라이더 이벤트 리스너 추가
-    document.getElementById('quality').addEventListener('input', updateSliderValues);
-    document.getElementById('fps_limit').addEventListener('input', updateSliderValues);
+// ===========================================
+document.addEventListener("DOMContentLoaded", function () {
+  console.log("AutocarZ 새 레이아웃 초기화 시작");
+
+  // [추가] CSS 캐시 강제 새로고침
+  forceRefreshCSS();
+
+  // [수정] 모든 슬라이더 값 표시를 한 번에 업데이트
+  updateAllSliderValues();
+
+  // [추가] 모든 슬라이더에 이벤트 리스너를 동적으로 추가
+  const sliders = document.querySelectorAll(".range-slider");
+  sliders.forEach((slider) => {
+    slider.addEventListener("input", function () {
+      updateAllSliderValues();
+    });
+  });
+
+  // [추가] 색상 보정 슬라이더에 대한 지연 적용 리스너 추가
+  const colorSliders = ["red_reduction", "green_boost", "blue_boost"];
+  colorSliders.forEach((id) => {
+    const slider = document.getElementById(id);
+    if (slider) {
+      slider.addEventListener("input", applyColorSettingsWithDelay);
+    }
+  });
+
+  // 비디오 스트림 에러 처리 설정
+  setupVideoErrorHandling();
+
+  // [추가] 현재 카메라 상태 업데이트
+  updateCurrentCameraStatus();
+
+  // 자동 상태 업데이트 시작
+  startStatusUpdates();
+
+  console.log("AutocarZ 새 레이아웃 초기화 완료");
 });
 
-// 슬라이더 값 표시 업데이트
-function updateSliderValues() {
-    const qualitySlider = document.getElementById('quality');
-    const fpsSlider = document.getElementById('fps_limit');
-    const qualityValue = document.getElementById('quality_value');
-    const fpsValue = document.getElementById('fps_value');
-    
-    if (qualitySlider && qualityValue) {
-        qualityValue.textContent = qualitySlider.value;
+// ===========================================
+// CSS 캐시 강제 새로고침
+// ===========================================
+function forceRefreshCSS() {
+  const links = document.querySelectorAll('link[rel="stylesheet"]');
+  links.forEach((link) => {
+    const href = link.getAttribute("href");
+    if (href) {
+      const newHref = href.split("?")[0] + "?v=" + new Date().getTime();
+      link.setAttribute("href", newHref);
     }
-    
-    if (fpsSlider && fpsValue) {
-        fpsValue.textContent = fpsSlider.value;
+  });
+
+  // 추가로 스타일 강제 적용
+  const style = document.createElement("style");
+  style.textContent = `
+    .center-video-area { gap: 0px !important; }
+    .video-info-section { 
+      padding: 3px 10px !important; 
+      margin: 0 !important; 
+      border-radius: 8px !important;
     }
+    .main-video-area { 
+      padding: 2px !important; 
+      margin: 0 !important; 
+      min-height: 500px !important;
+    }
+    .video-title { font-size: 0.9em !important; margin: 0 !important; }
+    .detection-legend { font-size: 0.75em !important; margin: 0 !important; }
+    .legend-item { padding: 2px 6px !important; margin: 0 !important; }
+    .color-indicator { width: 6px !important; height: 6px !important; }
+  `;
+  document.head.appendChild(style);
 }
+
+// ===========================================
+// 설정 패널 토글 기능
+// ===========================================
+function toggleSettings() {
+  const settingsContent = document.getElementById("settingsContent");
+  const toggleIcon = document.getElementById("settingsToggleIcon");
+
+  // [수정] null 체크 추가로 안정성 향상
+  if (!settingsContent || !toggleIcon) return;
+
+  if (settingsContent.style.display === "none") {
+    settingsContent.style.display = "block";
+    toggleIcon.textContent = "▼";
+  } else {
+    settingsContent.style.display = "none";
+    toggleIcon.textContent = "▲";
+  }
+}
+
+// ===========================================
+// 슬라이더 값 표시 업데이트 (통합 버전)
+// ===========================================
+// [수정] 모든 슬라이더 값을 한 번에 업데이트하는 통합 함수
+function updateAllSliderValues() {
+  const sliders = [
+    "quality",
+    "fps_limit",
+    "red_reduction",
+    "green_boost",
+    "blue_boost",
+  ];
+  sliders.forEach((id) => {
+    const slider = document.getElementById(id);
+    const valueSpan = document.getElementById(`${id}_value`);
+    // [수정] 요소가 존재하는지 반드시 확인하여 오류 방지
+    if (slider && valueSpan) {
+      valueSpan.textContent = slider.value;
+    }
+  });
+}
+
+// ===========================================
+// 카메라 상태 관리
+// ===========================================
+function updateCurrentCameraStatus() {
+  fetch("/get_current_camera")
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.success) {
+        // 현재 카메라 이름 업데이트
+        const currentCameraSpan = document.getElementById("currentCamera");
+        if (currentCameraSpan) {
+          currentCameraSpan.textContent = data.camera_name;
+        }
+
+        // 카메라 버튼 활성화 상태 업데이트
+        updateCameraButtonStates(data.camera_index);
+      }
+    })
+    .catch((error) => {
+      console.error("카메라 상태 가져오기 오류:", error);
+    });
+}
+
+function updateCameraButtonStates(activeIndex) {
+  // 모든 카메라 버튼에서 active 클래스 제거
+  const cameraButtons = document.querySelectorAll(".btn-camera");
+  cameraButtons.forEach((button) => {
+    button.classList.remove("active");
+  });
+
+  // 현재 활성화된 카메라 버튼에 active 클래스 추가
+  const activeButton = document.getElementById(`camera-${activeIndex}`);
+  if (activeButton) {
+    activeButton.classList.add("active");
+  }
+}
+
+// ===========================================
+// 모든 설정 적용 함수들
+// ===========================================
 
 // 검출 설정 적용
 function applyDetectionSettings() {
-    const detection_settings = {
-        yolo_enabled: document.getElementById('yolo_enabled').checked,
-        opencv_enabled: document.getElementById('opencv_enabled').checked,
-        show_fps: document.getElementById('show_fps').checked,
-        quality: parseInt(document.getElementById('quality').value),
-        fps_limit: parseInt(document.getElementById('fps_limit').value)
-    };
-    
-    showLoading('검출 설정 적용 중...');
-    
-    fetch('/update_detection_settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(detection_settings)
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        showMessage(data.message, data.success ? 'success' : 'error');
-        
-        if (data.success) {
-            // 설정 적용 후 비디오 스트림 새로고침
-            refreshVideoStream();
-        }
-    })
-    .catch(error => {
-        hideLoading();
-        showMessage('설정 적용 중 오류가 발생했습니다: ' + error.message, 'error');
-    });
+  const settings = {
+    yolo_enabled: document.getElementById("yolo_enabled").checked,
+    opencv_enabled: document.getElementById("opencv_enabled").checked,
+    show_fps: document.getElementById("show_fps").checked,
+    quality: parseInt(document.getElementById("quality").value),
+    fps_limit: parseInt(document.getElementById("fps_limit").value),
+  };
+  postSettings("/update_detection_settings", settings, "검출 설정 적용");
 }
 
-// 카메라 설정 적용
+// 카메라(뒤집기/회전) 설정 적용
 function applySettings() {
-    const settings = {
-        horizontal: document.getElementById('horizontal').checked,
-        vertical: document.getElementById('vertical').checked,
-        rotation: parseInt(document.getElementById('rotation').value)
-    };
-    
-    showLoading('카메라 설정 적용 중...');
-    
-    fetch('/update_settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
-    })
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        showMessage(data.message, data.success ? 'success' : 'error');
-    })
-    .catch(error => {
-        hideLoading();
-        showMessage('카메라 설정 적용 중 오류가 발생했습니다: ' + error.message, 'error');
-    });
+  const settings = {
+    horizontal: document.getElementById("horizontal").checked,
+    vertical: document.getElementById("vertical").checked,
+    rotation: parseInt(document.getElementById("rotation").value),
+  };
+  postSettings("/update_flip_settings", settings, "카메라 설정 적용");
 }
 
-// 전체 설정 초기화
-function resetSettings() {
-    if (confirm('모든 설정을 초기화하시겠습니까?')) {
-        // UI 초기화
-        document.getElementById('horizontal').checked = false;
-        document.getElementById('vertical').checked = false;
-        document.getElementById('rotation').value = '0';
-        document.getElementById('yolo_enabled').checked = true;
-        document.getElementById('opencv_enabled').checked = true;
-        document.getElementById('show_fps').checked = true;
-        document.getElementById('quality').value = 85;
-        document.getElementById('fps_limit').value = 15;
-        
-        // 슬라이더 값 표시 업데이트
-        updateSliderValues();
-        
-        // 설정 적용
-        applySettings();
-        applyDetectionSettings();
-    }
+// [추가] 색상 보정 설정 적용
+function applyColorSettings() {
+  const settings = {
+    enabled: document.getElementById("color_correction_enabled").checked,
+    red_reduction: parseFloat(document.getElementById("red_reduction").value),
+    green_boost: parseFloat(document.getElementById("green_boost").value),
+    blue_boost: parseFloat(document.getElementById("blue_boost").value),
+    mode: document.getElementById("color_mode").value,
+  };
+  postSettings("/update_color_settings", settings, "색상 보정 적용");
 }
 
-// 빠른 반전 설정
-function setFlip(type) {
-    switch(type) {
-        case 'normal':
-            document.getElementById('horizontal').checked = false;
-            document.getElementById('vertical').checked = false;
-            document.getElementById('rotation').value = '0';
-            break;
-        case 'horizontal':
-            document.getElementById('horizontal').checked = true;
-            document.getElementById('vertical').checked = false;
-            document.getElementById('rotation').value = '0';
-            break;
-        case 'vertical':
-            document.getElementById('horizontal').checked = false;
-            document.getElementById('vertical').checked = true;
-            document.getElementById('rotation').value = '0';
-            break;
-        case 'both':
-            document.getElementById('horizontal').checked = true;
-            document.getElementById('vertical').checked = true;
-            document.getElementById('rotation').value = '0';
-            break;
-        case 'rotate180':
-            document.getElementById('horizontal').checked = false;
-            document.getElementById('vertical').checked = false;
-            document.getElementById('rotation').value = '180';
-            break;
-    }
-    applySettings();
-}
+// [추가] 설정을 서버로 전송하는 공통 함수
+function postSettings(endpoint, settings, actionName) {
+  console.log(`${actionName} 요청:`, settings);
+  showLoading(`${actionName} 중...`);
 
-// 메시지 표시
-function showMessage(msg, type) {
-    const messageDiv = document.getElementById('message');
-    messageDiv.textContent = msg;
-    messageDiv.className = 'status ' + type;
-    messageDiv.style.display = 'block';
-    
-    // 자동으로 메시지 숨기기
-    setTimeout(() => {
-        messageDiv.style.display = 'none';
-    }, 4000);
-}
+  fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      hideLoading();
+      if (data.success) {
+        showMessage(data.message || `${actionName} 완료!`, "success");
 
-// 로딩 표시
-function showLoading(message = '처리 중...') {
-    const messageDiv = document.getElementById('message');
-    messageDiv.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="spinner"></div>
-            <span>${message}</span>
-        </div>
-    `;
-    messageDiv.className = 'status info';
-    messageDiv.style.display = 'block';
-    
-    // 스피너 CSS 동적 추가
-    if (!document.getElementById('spinner-style')) {
-        const style = document.createElement('style');
-        style.id = 'spinner-style';
-        style.textContent = `
-            .spinner {
-                width: 20px;
-                height: 20px;
-                border: 2px solid #f3f3f3;
-                border-top: 2px solid #007bff;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
-
-// 로딩 숨기기
-function hideLoading() {
-    const messageDiv = document.getElementById('message');
-    messageDiv.style.display = 'none';
-}
-
-// 비디오 스트림 새로고침
-function refreshVideoStream() {
-    const videoImg = document.querySelector('.video-stream');
-    if (videoImg) {
-        const currentSrc = videoImg.src;
-        videoImg.src = '';
-        setTimeout(() => {
-            videoImg.src = currentSrc + '?t=' + new Date().getTime();
-        }, 100);
-    }
-}
-
-// 시스템 상태 확인
-function checkSystemStatus() {
-    fetch('/status')
-    .then(response => response.json())
-    .then(data => {
-        console.log('시스템 상태:', data);
-        updateStatusDisplay(data);
-    })
-    .catch(error => {
-        console.error('상태 확인 오류:', error);
-    });
-}
-
-// 상태 표시 업데이트
-function updateStatusDisplay(statusData) {
-    // FPS 정보가 있으면 표시
-    if (statusData.current_fps !== undefined) {
-        const statusInfo = document.querySelector('.status.info');
-        if (statusInfo) {
-            const fpsInfo = statusInfo.querySelector('.fps-info');
-            if (fpsInfo) {
-                fpsInfo.textContent = `현재 FPS: ${statusData.current_fps}`;
-            } else {
-                const fpsElement = document.createElement('p');
-                fpsElement.className = 'fps-info';
-                fpsElement.innerHTML = `<strong>현재 FPS:</strong> ${statusData.current_fps}`;
-                statusInfo.appendChild(fpsElement);
-            }
+        // [추가] 카메라 전환인 경우 UI 업데이트
+        if (endpoint === "/switch_camera" && data.camera_name) {
+          const currentCameraSpan = document.getElementById("currentCamera");
+          if (currentCameraSpan) {
+            currentCameraSpan.textContent = data.camera_name;
+          }
+          updateCameraButtonStates(data.camera_index);
         }
-    }
+
+        refreshVideoStream();
+      } else {
+        showMessage(data.error || `${actionName} 실패.`, "error");
+      }
+    })
+    .catch((error) => {
+      hideLoading();
+      console.error(`${actionName} 오류:`, error);
+      showMessage(`${actionName} 중 오류 발생.`, "error");
+    });
 }
 
-// 키보드 단축키 지원
-document.addEventListener('keydown', function(event) {
-    // Ctrl + R: 설정 초기화
-    if (event.ctrlKey && event.key === 'r') {
-        event.preventDefault();
-        resetSettings();
-    }
-    
-    // Ctrl + S: 현재 설정 적용
-    if (event.ctrlKey && event.key === 's') {
-        event.preventDefault();
-        applySettings();
-        applyDetectionSettings();
-    }
-    
-    // 스페이스바: YOLO 토글
-    if (event.code === 'Space' && event.target.tagName !== 'INPUT') {
-        event.preventDefault();
-        const yoloCheckbox = document.getElementById('yolo_enabled');
-        yoloCheckbox.checked = !yoloCheckbox.checked;
-        applyDetectionSettings();
-    }
-    
-    // C 키: OpenCV 토글
-    if (event.key === 'c' && event.target.tagName !== 'INPUT') {
-        const opencvCheckbox = document.getElementById('opencv_enabled');
-        opencvCheckbox.checked = !opencvCheckbox.checked;
-        applyDetectionSettings();
-    }
-});
-
-// 자동 상태 확인 (5초마다)
-setInterval(checkSystemStatus, 5000);
-
-// 비디오 스트림 에러 처리
-document.addEventListener('DOMContentLoaded', function() {
-    const videoImg = document.querySelector('.video-stream');
-    if (videoImg) {
-        videoImg.addEventListener('error', function() {
-            console.log('비디오 스트림 로드 오류, 재시도 중...');
-            setTimeout(() => {
-                refreshVideoStream();
-            }, 2000);
-        });
-        
-        videoImg.addEventListener('load', function() {
-            console.log('비디오 스트림 로드 완료');
-        });
-    }
-});
-
-// 품질 및 FPS 실시간 적용
-let settingsTimeout;
-function applySettingsWithDelay() {
-    clearTimeout(settingsTimeout);
-    settingsTimeout = setTimeout(() => {
-        applyDetectionSettings();
-    }, 1000); // 1초 후 적용
+// ===========================================
+// 설정 초기화 함수들
+// ===========================================
+function resetSettings() {
+  if (confirm("카메라(뒤집기/회전) 설정을 초기화하시겠습니까?")) {
+    postSettings("/reset_flip_settings", {}, "카메라 설정 초기화");
+    // [추가] UI도 원래 값으로 복원
+    document.getElementById("horizontal").checked = false;
+    document.getElementById("vertical").checked = false;
+    document.getElementById("rotation").value = 0;
+  }
 }
 
-// 슬라이더 실시간 업데이트
-document.addEventListener('DOMContentLoaded', function() {
-    const qualitySlider = document.getElementById('quality');
-    const fpsSlider = document.getElementById('fps_limit');
-    
-    if (qualitySlider) {
-        qualitySlider.addEventListener('input', function() {
-            updateSliderValues();
-            applySettingsWithDelay();
-        });
-    }
-    
-    if (fpsSlider) {
-        fpsSlider.addEventListener('input', function() {
-            updateSliderValues();
-            applySettingsWithDelay();
-        });
-    }
-});
-
-// 화면 크기 변경 감지
-window.addEventListener('resize', function() {
-    // 모바일 화면에서 비디오 크기 조정
-    const videoContainer = document.querySelector('.video-container');
-    if (videoContainer && window.innerWidth < 768) {
-        videoContainer.style.padding = '10px';
-    } else if (videoContainer) {
-        videoContainer.style.padding = '20px';
-    }
-});
-
-// 터치 디바이스 지원
-if ('ontouchstart' in window) {
-    document.body.classList.add('touch-device');
-    
-    // 터치 이벤트로 비디오 새로고침
-    const videoImg = document.querySelector('.video-stream');
-    if (videoImg) {
-        let touchStartTime;
-        
-        videoImg.addEventListener('touchstart', function() {
-            touchStartTime = Date.now();
-        });
-        
-        videoImg.addEventListener('touchend', function() {
-            const touchDuration = Date.now() - touchStartTime;
-            // 긴 터치(1초 이상)로 비디오 새로고침
-            if (touchDuration > 1000) {
-                refreshVideoStream();
-                showMessage('비디오 스트림을 새로고침했습니다.', 'info');
-            }
-        });
-    }
+// [추가] 색상 설정 초기화
+function resetColorSettings() {
+  if (confirm("색상 보정 설정을 초기화하시겠습니까?")) {
+    postSettings("/reset_color_settings", {}, "색상 설정 초기화");
+    // [추가] UI도 원래 값으로 복원
+    document.getElementById("color_correction_enabled").checked = false;
+    document.getElementById("red_reduction").value = 0.9;
+    document.getElementById("green_boost").value = 1.1;
+    document.getElementById("blue_boost").value = 1.1;
+    document.getElementById("color_mode").value = "standard";
+    updateAllSliderValues();
+  }
 }
 
-// 성능 모니터링
-let performanceData = {
-    frameCount: 0,
-    startTime: Date.now()
-};
-
-function logPerformance() {
-    performanceData.frameCount++;
-    const elapsed = Date.now() - performanceData.startTime;
-    
-    if (elapsed > 10000) { // 10초마다 로그
-        const avgFPS = (performanceData.frameCount / elapsed * 1000).toFixed(1);
-        console.log(`평균 FPS: ${avgFPS}`);
-        
-        // 리셋
-        performanceData.frameCount = 0;
-        performanceData.startTime = Date.now();
-    }
+// ===========================================
+// 카메라 전환 기능
+// ===========================================
+function switchCamera(cameraIndex) {
+  console.log(`카메라 전환 시도: ${cameraIndex}`);
+  postSettings("/switch_camera", { camera_index: cameraIndex }, "카메라 전환");
 }
 
-// 비디오 프레임 변경 감지 (실험적)
-document.addEventListener('DOMContentLoaded', function() {
-    const videoImg = document.querySelector('.video-stream');
-    if (videoImg) {
-        videoImg.addEventListener('load', logPerformance);
-    }
-});
+// ===========================================
+// 비디오 스트림 및 상태 관리
+// ===========================================
+function refreshVideoStream() {
+  const videoElement = document.getElementById("videoStream");
+  if (videoElement) {
+    const timestamp = new Date().getTime();
+    videoElement.src = `/video_feed?t=${timestamp}`;
+  }
+}
 
-// 오류 보고
-window.addEventListener('error', function(event) {
-    console.error('JavaScript 오류:', event.error);
-    showMessage('예상치 못한 오류가 발생했습니다. 페이지를 새로고침해보세요.', 'error');
-});
+function setupVideoErrorHandling() {
+  const videoImg = document.getElementById("videoStream");
+  if (!videoImg) return;
 
-// 네트워크 상태 확인
-window.addEventListener('online', function() {
-    showMessage('네트워크 연결이 복구되었습니다.', 'success');
-    refreshVideoStream();
-});
+  videoImg.addEventListener("error", function () {
+    console.warn("비디오 스트림 로드 오류, 3초 후 재시도");
+    setTimeout(() => refreshVideoStream(), 3000);
+  });
+}
 
-window.addEventListener('offline', function() {
-    showMessage('네트워크 연결이 끊어졌습니다.', 'error');
-});
+// ===========================================
+// 상태 업데이트 및 모니터링
+// ===========================================
+function startStatusUpdates() {
+  // 5초마다 시스템 상태 체크
+  setInterval(checkSystemStatus, 5000);
+
+  // 10초마다 카메라 상태 체크
+  setInterval(updateCurrentCameraStatus, 10000);
+}
+
+function checkSystemStatus() {
+  // 시스템 상태 체크 로직 (필요시 구현)
+  console.log("시스템 상태 체크 중...");
+}
+
+// ===========================================
+// 유틸리티 함수들
+// ===========================================
+function showMessage(msg, type = "info") {
+  const overlay = document.createElement("div");
+  overlay.className = `message-overlay ${type}`;
+  overlay.textContent = msg;
+  document.body.appendChild(overlay);
+
+  setTimeout(() => overlay.classList.add("show"), 100);
+  setTimeout(() => {
+    overlay.classList.remove("show");
+    setTimeout(() => document.body.removeChild(overlay), 300);
+  }, 3000);
+}
+
+function showLoading(message = "처리 중...") {
+  // 로딩 표시 로직 (필요시 구현)
+  console.log("로딩:", message);
+}
+
+function hideLoading() {
+  // 로딩 숨김 로직 (필요시 구현)
+  console.log("로딩 완료");
+}
+
+// ===========================================
+// 색상 보정 지연 적용
+// ===========================================
+function applyColorSettingsWithDelay() {
+  clearTimeout(window.colorSettingsTimeout);
+  window.colorSettingsTimeout = setTimeout(() => {
+    applyColorSettings();
+  }, 500);
+}
+
+// ===========================================
+// 기타 유틸리티 함수들
+// ===========================================
+function checkStatus() {
+  // 상태 체크 로직
+}
+
+function detectCameras() {
+  // 카메라 감지 로직
+}
+
+function getDebugLog() {
+  // 디버그 로그 가져오기
+}
+
+function clearLog() {
+  // 로그 클리어
+}
+
+function showDebugInfo(title, content) {
+  // 디버그 정보 표시
+}
